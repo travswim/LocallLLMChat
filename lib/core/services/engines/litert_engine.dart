@@ -28,10 +28,41 @@ class LiteRTEngine implements InferenceProvider {
 
     try {
       final options = InterpreterOptions();
-      // Simple thread configuration for now.
-      // Hardware delegates like GpuDelegateV2 are available in tflite_flutter but require specific setup.
-      // We will default to CPU/XNNPACK (often enabled by default) for stability unless configured.
-      options.threads = 4;
+      options.threads = 4; // Default CPU threads
+
+      // Attempt Hardware Acceleration
+      if (Platform.isAndroid) {
+        try {
+          // GpuDelegateV2 for Android
+          final gpuDelegate = GpuDelegateV2(
+            options: GpuDelegateOptionsV2(
+              isPrecisionLossAllowed: true,
+              // inferencePreference: Use default
+            ),
+          );
+          options.addDelegate(gpuDelegate);
+          _isHardwareAccelerated = true;
+          debugPrint('LiteRTEngine: Added GpuDelegateV2 (Android).');
+        } catch (e) {
+          debugPrint('LiteRTEngine: Failed to add GpuDelegateV2: $e');
+          // Fallback to CPU automatically as delegate wasn't added
+        }
+      } else if (Platform.isIOS) {
+        try {
+          // GpuDelegate (Metal) for iOS
+          final gpuDelegate = GpuDelegate(
+            options: GpuDelegateOptions(
+              allowPrecisionLoss: true,
+              // waitType: Use default
+            ),
+          );
+          options.addDelegate(gpuDelegate);
+          _isHardwareAccelerated = true;
+          debugPrint('LiteRTEngine: Added GpuDelegate (iOS).');
+        } catch (e) {
+          debugPrint('LiteRTEngine: Failed to add GpuDelegate (iOS): $e');
+        }
+      }
 
       if (isAsset) {
         _interpreter = await Interpreter.fromAsset(modelPath, options: options);
@@ -43,11 +74,6 @@ class LiteRTEngine implements InferenceProvider {
       _isolateInterpreter = await IsolateInterpreter.create(
         address: _interpreter!.address,
       );
-
-      // Check delegates to set isHardwareAccelerated flag?
-      // _interpreter.getOutputTensor(0).type ...
-      // For now, assume CPU unless we explicitly add GPU delegate
-      _isHardwareAccelerated = false;
     } catch (e) {
       throw Exception('LiteRTEngine: Failed to load model: $e');
     }

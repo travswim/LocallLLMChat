@@ -28,14 +28,49 @@ class _ChatScreenState extends State<ChatScreen> {
       appBar: AppBar(
         title: const Text('Local LLM Chat'),
         actions: [
-          IconButton(
-            icon: const Icon(Icons.settings),
-            onPressed: () {
-              // Initializer / Manager
-              context.read<ChatBloc>().add(
-                const LoadModelRequested('gemma-2b-it-gpu-int4.bin'),
-              );
+          BlocBuilder<ChatBloc, ChatState>(
+            builder: (context, state) {
+              if (state.activeModel != null) {
+                return Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 8.0),
+                  child: Row(
+                    children: [
+                      Icon(
+                        state.isHardwareAccelerated
+                            ? Icons.flash_on
+                            : Icons.flash_off,
+                        color: state.isHardwareAccelerated
+                            ? Colors.amber
+                            : Colors.grey,
+                        size: 20,
+                      ),
+                      const SizedBox(width: 4),
+                      Text(
+                        state.engineType?.toUpperCase() ?? 'UNK',
+                        style: const TextStyle(fontSize: 12),
+                      ),
+                    ],
+                  ),
+                );
+              }
+              return const SizedBox.shrink();
             },
+          ),
+          PopupMenuButton<String>(
+            icon: const Icon(Icons.settings),
+            onSelected: (value) {
+              context.read<ChatBloc>().add(LoadModelRequested(value));
+            },
+            itemBuilder: (context) => [
+              const PopupMenuItem(
+                value: 'assets/gemma-2b-it-gpu-int4.bin',
+                child: Text('Load Gemma 2B (MediaPipe, Asset)'),
+              ),
+              const PopupMenuItem(
+                value: 'assets/model.tflite',
+                child: Text('Load TFLite Model (LiteRT, Asset)'),
+              ),
+            ],
           ),
         ],
       ),

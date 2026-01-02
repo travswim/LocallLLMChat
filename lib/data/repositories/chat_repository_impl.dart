@@ -10,9 +10,15 @@ class ChatRepositoryImpl implements ChatRepository {
   ChatRepositoryImpl(this._orchestrator);
 
   @override
-  Future<void> initializeSession(String modelPath) async {
-    await _orchestrator.loadModel(modelPath);
+  Future<void> initialize(String modelPath, {bool isAsset = false}) async {
+    await _orchestrator.loadModel(modelPath, isAsset: isAsset);
   }
+
+  @override
+  bool get isHardwareAccelerated => _orchestrator.isHardwareAccelerated;
+
+  @override
+  String get activeEngine => _orchestrator.activeEngineKey;
 
   @override
   Stream<String> sendMessage(String message) {

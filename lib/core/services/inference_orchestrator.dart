@@ -3,11 +3,15 @@ import 'dart:async';
 import 'engines/inference_provider.dart';
 import 'engines/mediapipe_engine.dart';
 import 'engines/litert_engine.dart';
+import '../native_bridge/memory_bridge.dart';
+import 'extraction_service.dart';
 
 class InferenceOrchestrator {
   InferenceProvider? _activeEngine;
   final MediaPipeEngine _mediaPipeEngine = MediaPipeEngine();
   final LiteRTEngine _liteRTEngine = LiteRTEngine();
+  final MemoryBridge _memoryBridge = MemoryBridge();
+  final ExtractionService _extractionService = ExtractionService();
 
   bool get isHardwareAccelerated =>
       _activeEngine?.isHardwareAccelerated ?? false;
@@ -16,7 +20,44 @@ class InferenceOrchestrator {
   Future<void> loadModel(String modelPath, {bool isAsset = false}) async {
     await dispose();
 
-    // Route based on extension/type
+    // 1. Check RAM Safety
+    try {
+      final availableRam = await _memoryBridge.getAvailableMemory();
+      debugPrint(
+        'InferenceOrchestrator: Available RAM: ${availableRam / 1024 / 1024} MB',
+      );
+
+      // Simple guard: If < 500MB available, warn or throw.
+      // Note: Model size check would be better if we knew the model size beforehand.
+      if (availableRam != -1 && availableRam < 500 * 1024 * 1024) {
+        debugPrint(
+          'WARNING: Low memory detected ($availableRam bytes). Loading might fail.',
+        );
+        // We could throw MemoryPressureException() here if strict.
+      }
+    } catch (e) {
+      debugPrint(
+        'InferenceOrchestrator: Memory check passed with warning or ignored: $e',
+      );
+    }
+
+    // 2. Extract Asset if needed
+    String effectivePath = modelPath;
+    if (isAsset) {
+      try {
+        final fileName = modelPath.split('/').last;
+        debugPrint('InferenceOrchestrator: Extracting asset $modelPath...');
+        effectivePath = await _extractionService.extractModelIfNeeded(
+          modelPath,
+          fileName,
+        );
+        debugPrint('InferenceOrchestrator: Model extracted to $effectivePath');
+      } catch (e) {
+        throw Exception('Failed to extract model asset: $e');
+      }
+    }
+
+    // 3. Route based on extension/type
     if (_mediaPipeEngine.supportsExtension(modelPath.split('.').last)) {
       _activeEngine = _mediaPipeEngine;
     } else if (_liteRTEngine.supportsExtension(modelPath.split('.').last)) {
@@ -29,13 +70,14 @@ class InferenceOrchestrator {
     debugPrint('InferenceOrchestrator: Routing to ${_activeEngine!.engineKey}');
 
     try {
-      await _activeEngine!.loadModel(modelPath, isAsset: isAsset);
+      // We pass the effective (extracted) path and isAsset: false because we handled it.
+      await _activeEngine!.loadModel(effectivePath, isAsset: false);
       await _warmUp();
     } catch (e) {
       debugPrint(
         'InferenceOrchestrator: Load failed for ${_activeEngine!.engineKey}. Error: $e',
       );
-      // Potential fallback logic here (e.g., if MediaPipe fails, try LiteRT?)
+      // Potential fallback logic can be added here
       rethrow;
     }
   }

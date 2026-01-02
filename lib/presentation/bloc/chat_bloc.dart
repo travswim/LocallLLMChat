@@ -25,11 +25,14 @@ class ChatBloc extends Bloc<ChatEvent, ChatState> {
   ) async {
     emit(state.copyWith(status: ChatStatus.loadingModel));
     try {
-      await _chatRepository.initializeSession(event.modelPath);
+      final isAsset = event.modelPath.startsWith('assets/');
+      await _chatRepository.initialize(event.modelPath, isAsset: isAsset);
       emit(
         state.copyWith(
           status: ChatStatus.ready,
           activeModel: event.modelPath,
+          isHardwareAccelerated: _chatRepository.isHardwareAccelerated,
+          engineType: _chatRepository.activeEngine,
           messages: _chatRepository.getHistory(), // Load persistence if any
         ),
       );

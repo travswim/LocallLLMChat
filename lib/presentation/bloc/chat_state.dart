@@ -8,12 +8,16 @@ class ChatState extends Equatable {
   final List<ChatMessage> messages;
   final String? errorMessage;
   final String? activeModel;
+  final bool isHardwareAccelerated;
+  final String? engineType;
 
   const ChatState({
     this.status = ChatStatus.initial,
     this.messages = const [],
     this.errorMessage,
     this.activeModel,
+    this.isHardwareAccelerated = false,
+    this.engineType,
   });
 
   ChatState copyWith({
@@ -21,16 +25,27 @@ class ChatState extends Equatable {
     List<ChatMessage>? messages,
     String? errorMessage,
     String? activeModel,
+    bool? isHardwareAccelerated,
+    String? engineType,
   }) {
     return ChatState(
       status: status ?? this.status,
       messages: messages ?? this.messages,
-      errorMessage:
-          errorMessage, // Clear error if not provided? Or keep? Usually clear on new state.
+      errorMessage: errorMessage,
       activeModel: activeModel ?? this.activeModel,
+      isHardwareAccelerated:
+          isHardwareAccelerated ?? this.isHardwareAccelerated,
+      engineType: engineType ?? this.engineType,
     );
   }
 
   @override
-  List<Object?> get props => [status, messages, errorMessage, activeModel];
+  List<Object?> get props => [
+    status,
+    messages,
+    errorMessage,
+    activeModel,
+    isHardwareAccelerated,
+    engineType,
+  ];
 }
